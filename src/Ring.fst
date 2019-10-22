@@ -19,14 +19,14 @@ let enclave_memory_region (_:unit) : ST HS.rid
   = new_region HS.root
 
 //allocate external memory
-let create_host_memory (host_rid: HS.rid) (#a:eqtype) (init: a)  (size: UInt32.t) : ST (B.buffer a)
+let create_host_memory (#a:eqtype) (host_rid: HS.rid)  (init: a)  (size: UInt32.t) : ST (B.buffer a)
   (requires fun _ -> is_eternal_region host_rid 
                   /\ UInt32.v size > 0)
   (ensures fun h0 b h1 -> live h1 b) 
   = B.malloc host_rid init size  
 
 //allocate enclave memory
-let create_enclave_memory (e_rid: HS.rid) (#a:eqtype) (init: a) (size: UInt32.t) : ST (B.buffer a)
+let create_enclave_memory (#a:eqtype) (e_rid: HS.rid) (init: a) (size: UInt32.t) : ST (B.buffer a)
   (requires fun _ -> is_eternal_region e_rid 
                   /\ UInt32.v size > 0)
   (ensures fun h0 b h1 -> live h1 b) 
@@ -147,7 +147,7 @@ let pop (#a:eqtype) (r: ringstruct a{B.length r.rbuf = UInt32.v r.rsize}) : ST (
  * should be equal to the pushed element. Else, we don't care.
  * For simplicity, 16l is hardcoded.
  *)
-let main (): ST (option Int32.t)
+let test_ringbuffer (): ST (option Int32.t)
      (requires fun h0 -> true)
      (ensures fun h0 r h1 -> match r with
      | Value v -> v == 16l
@@ -170,4 +170,10 @@ let main (): ST (option Int32.t)
   else
     Error 
 
+let main () : ST Int32.t
+  (requires fun h0 -> true)
+  (ensures fun h0 r h1 -> true)
+  = 
+  let _ = test_ringbuffer () in
+  0l
 
