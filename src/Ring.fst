@@ -6,7 +6,6 @@ module HS = FStar.HyperStack
 module HST = FStar.HyperStack.ST
 open LowStar.BufferOps
 open FStar.HyperStack.ST
-open Test
 include LowStar.Monotonic.Buffer
 
 let host_memory_region (_:unit) : ST HS.rid

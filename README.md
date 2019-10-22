@@ -8,4 +8,4 @@ Examples verified in LowStar
 
 ## Running the programs
 
--
+- krml -verify Ring.fst
