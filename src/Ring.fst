@@ -66,11 +66,18 @@ let is_rb_empty (#a:eqtype) (r:ringstruct a) : Pure bool
   (ensures fun _ -> true)
   = UInt32.eq r.head r.tail
 
-
+(* push: pushes an element at the head position
+ * The pre-condition says that the invariants of the ringbuffer, namely,
+ * 1. head and tail are always less than the size of the buffer
+ * 2. size of the buffer is at least 1
+ * 3. Buffer is live
+ * hold. The post-condition says that if the 'push' is successful, then
+ * the resulting buffer in the new heap is same as the buffer in the old heap with the element
+ * pushed into the head position. If not, buffer remains the same.
+ * The post-condition also says that the invariants are preserved, and that the buffer is live.
+ *)
 let push (#a:eqtype) (r: ringstruct a {B.length r.rbuf = UInt32.v r.rsize}) (v: a) : ST ((ringstruct a)*bool)
   (requires fun h0 -> live h0 r.rbuf /\ (B.length r.rbuf > 0)
-//                   /\ B.length r.rbuf > (UInt32.v r.head)
-//                   /\ B.length r.rbuf = (UInt32.v r.rsize)
                    /\ UInt32.lt r.head r.rsize
                    /\ UInt32.lt r.tail r.rsize
                    )
@@ -99,7 +106,13 @@ type option 'a =
  | Error : option 'a
  | Value : v:'a -> option 'a
  
-// pop off the element at tail
+(* pop:  pop off the element at tail
+ * The pre-condition checks that the invariants of the ringbuffer hold while
+ * the post-condition says that the element read from the ringbuffer is same as the 
+ * one read from the same index in the sequence formed from buffer. When the ringbuffer is full
+ * tail is not modified other tail is modified.
+ * The post-condition also says that the invariants are preserved
+ *)
 let pop (#a:eqtype) (r: ringstruct a{B.length r.rbuf = UInt32.v r.rsize}) : ST ((ringstruct a) * (option a)) 
   (requires (fun h0 -> live h0 r.rbuf 
                    /\ UInt32.lt r.head r.rsize
@@ -129,9 +142,17 @@ let pop (#a:eqtype) (r: ringstruct a{B.length r.rbuf = UInt32.v r.rsize}) : ST (
 
 
 
-let main (): ST Int32.t
+(* A simple program that pushes and pops an element from ring buffer
+ * The specification says that when operations are successful, the popped element 
+ * should be equal to the pushed element. Else, we don't care.
+ * For simplicity, 16l is hardcoded.
+ *)
+let main (): ST (option Int32.t)
      (requires fun h0 -> true)
-     (ensures fun h0 r h1 -> r == 16l) =
+     (ensures fun h0 r h1 -> match r with
+     | Value v -> v == 16l
+     | Error -> true
+     ) =
   let host_rid = host_memory_region () in   
   // create host memory
   let host_memory = create_host_memory host_rid 0l 256ul in
@@ -145,10 +166,8 @@ let main (): ST Int32.t
   let (rb', status) = push rb 16l in
   if status then
     let (rb'', o) = pop rb' in
-      match o with
-      | Error -> 16l
-      | Value v -> v
+    o
   else
-     16l 
+    Error 
 
 

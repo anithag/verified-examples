@@ -8,4 +8,5 @@ Examples verified in LowStar
 
 ## Running the programs
 
-- krml -verify Ring.fst
+1. cd src
+2. krml -verify -no-prefix Ring -bundle WasmSupport Ring.fst
