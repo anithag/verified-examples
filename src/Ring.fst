@@ -4,6 +4,9 @@ module M = LowStar.Modifies
 module B = LowStar.Buffer
 module HS = FStar.HyperStack
 module HST = FStar.HyperStack.ST
+module U64 =   FStar.UInt64
+module I8 =   FStar.Int8
+module U8 =   FStar.UInt8
 open LowStar.BufferOps
 open FStar.HyperStack.ST
 include LowStar.Monotonic.Buffer
@@ -147,10 +150,10 @@ let pop (#a:eqtype) (r: ringstruct a{B.length r.rbuf = UInt32.v r.rsize}) : ST (
  * should be equal to the pushed element. Else, we don't care.
  * For simplicity, 16l is hardcoded.
  *)
-let test_ringbuffer (): ST (option Int32.t)
+let test_ringbuffer (): ST (option I8.t)
      (requires fun h0 -> true)
      (ensures fun h0 r h1 -> match r with
-     | Value v -> v == 16l
+     | Value v -> v == 1y
      | Error -> true
      ) =
   let host_rid = host_memory_region () in   
@@ -160,15 +163,15 @@ let test_ringbuffer (): ST (option Int32.t)
   let e_rid = enclave_memory_region () in
   let enclave_memory = create_enclave_memory e_rid 0l 128ul in
   let rlen = 32ul in
-  let rinit = 1l in
+  let rinit = 1y in
   //ringbuffer is located in host memory region but is disjoint from the host_memory
   let rb = {rbuf = B.malloc host_rid rinit rlen; head = 0ul; tail = 0ul; rsize=rlen}  in
-  let (rb', status) = push rb 16l in
-  if status then
-    let (rb'', o) = pop rb' in
-    o
+  let (rb', status) = push rb 1y in
+  if status then 
+      let (rb'', o) = pop rb' in
+      o
   else
-    Error 
+    Error
 
 let main () : ST Int32.t
   (requires fun h0 -> true)
