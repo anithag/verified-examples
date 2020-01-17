@@ -40,46 +40,38 @@ val host_rid : unit -> ST rid
 let host_rid _ = host_memory_region ()
 
 
-val create_ringst : unit -> ST (B.pointer ringstruct8)
-(requires fun h -> true )
-(ensures fun h0 res h1 -> true)
-let create_ringst _ =
-    let tmp = {rbuf = B.null; head = 0ul; tail = 0ul; rsize = 0ul} in
-    let hid = host_rid ()  in
-    B.malloc hid tmp  1ul
-
-private val ringst:B.pointer ringstruct8
-let ringst = create_ringst ()
-
   
-type message = UInt32.t
+type message = UInt8.t
 type size_t = UInt32.t
+type datapointer = B.pointer message
      
 
-let constructor (s:size_t {gt s 0ul}) (hid: rid) : ST unit 
-(requires fun h -> B.live h ringst
+let init (s:size_t {gt s 0ul}) (hid: rid) : ST ringstruct8
+(requires fun h -> true
 /\ is_eternal_region hid)
-(ensures fun h0 res h1 -> B.live h1 ringst)
- =
-  let tmp = {rbuf = B.malloc hid 0uy s; head = 0ul; tail = 0ul; rsize=s} in
- ringst *= tmp
+(ensures fun h0 res h1 -> B.modifies B.loc_none h0 h1 
+)
+ = Ring.init 0uy s hid
+   
+ 
 
-
-let wellformed_rs_spec (r:ringstruct8) : Tot bool
-  = if (UInt32.lt r.head r.rsize &&  UInt32.lt r.tail r.rsize) then
-       true
-    else
-      false 
-
-
-abstract val read :  f:(message -> ringstruct8  ->UInt32.t -> ringstruct8) -> ST bool
-  (requires fun h -> forall m r u. (wellformed_rs_spec r = true)  ==>   (wellformed_rs_spec (f m r u) = true)
-  /\ (wellformed_rs_spec r = true) 
+abstract let read (r: ringstruct8) (f:datapointer  -> UInt32.t -> unit) : ST ringstruct8
+  (requires fun h -> 
+     live_rb h r
+     /\ well_formed_rb r
   )
-  (ensures fun h0 r h1 -> true)
+  (ensures fun h0 r h1 -> 
+  live_rb h1 r
+  /\ well_formed_rb r) 
+  =
+  let (r', header) = Ring.pop r in
+  let (r'', o) = Ring.pop r' in
+  match o with
+  | Error -> r
+  | Value m ->  // copy to datapointer
+    let mptr = B.gcmalloc root m 1ul in
+    // call handler. For now hard coding the size of the message
+    let _ = f mptr 1ul in
+    r''
+  
 
-
-// read a serialized message by deserializing it
-abstract val read_message : (#a:eqtype)-> r:(ringstruct a) -> size:U8.t-> ST (ringstruct a)
-  (requires fun h -> true)
-  (ensures fun h0 r h1 -> true)

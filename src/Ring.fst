@@ -42,7 +42,7 @@ let read_host_memory (host_buffer:B.buffer Int8.t) (addr:UInt32.t) : ST Int8.t
   (ensures fun h0 b h1 -> M.modifies (loc_buffer host_buffer) h0 h1) = (FStar.Int8.int_to_t 0)
 
 
-noeq
+abstract noeq
 type ringstruct a = { rbuf: B.buffer a; head: UInt32.t; tail: UInt32.t; rsize: UInt32.t}
 
 
@@ -69,6 +69,18 @@ let is_rb_empty (#a:eqtype) (r:ringstruct a) : Pure bool
   (ensures fun _ -> true)
   = UInt32.eq r.head r.tail
 
+let well_formed_rb (#a:eqtype) (r:ringstruct a): GTot bool
+//(requires true)
+//(ensures fun _ -> true)
+  = 
+   UInt32.lt r.head r.rsize && 
+   UInt32.lt r.tail r.rsize &&
+   B.length r.rbuf = UInt32.v r.rsize &&
+   B.length r.rbuf > 0
+  
+let live_rb (#a:eqtype) (h:HS.mem) (r:ringstruct a) : GTot Type0
+= B.live h r.rbuf
+
 (* push: pushes an element at the head position
  * The pre-condition says that the invariants of the ringbuffer, namely,
  * 1. head and tail are always less than the size of the buffer
@@ -79,19 +91,22 @@ let is_rb_empty (#a:eqtype) (r:ringstruct a) : Pure bool
  * pushed into the head position. If not, buffer remains the same.
  * The post-condition also says that the invariants are preserved, and that the buffer is live.
  *)
-let push (#a:eqtype) (r: ringstruct a {B.length r.rbuf = UInt32.v r.rsize}) (v: a) : ST ((ringstruct a)*bool)
-  (requires fun h0 -> live h0 r.rbuf /\ (B.length r.rbuf > 0)
-                   /\ UInt32.lt r.head r.rsize
-                   /\ UInt32.lt r.tail r.rsize
+let push (#a:eqtype) (r: ringstruct a) (v: a) : ST ((ringstruct a)*bool)
+  (requires fun h0 -> live_rb h0 r
+//                   /\ (B.length r.rbuf > 0)
+//                   /\ UInt32.lt r.head r.rsize
+//                   /\ UInt32.lt r.tail r.rsize
+                   /\  well_formed_rb r
                    )
   (ensures fun h0 res h1 -> modifies (loc_buffer r.rbuf) h0 h1
-                      /\ live h1 (fst res).rbuf 
+                      /\ live_rb h1 (fst res) 
                       /\ ((snd res) == true ==>  as_seq h1 (fst res).rbuf == Seq.upd (as_seq h0 r.rbuf) (UInt32.v (incr_ht r.head r.rsize)) v)
                       /\ ((snd res) == false ==>  as_seq h1 (fst res).rbuf == as_seq h0 r.rbuf)
                       /\ B.length (fst res).rbuf = UInt32.v (fst res).rsize
                       /\ (fst res).tail == r.tail 
                       /\ UInt32.lt (fst res).head r.rsize
                       /\ (fst res).rsize == r.rsize
+                      /\ well_formed_rb (fst res)
                      )
   =
   let b = is_rb_full r in
@@ -116,12 +131,13 @@ type option 'a =
  * tail is not modified other tail is modified.
  * The post-condition also says that the invariants are preserved
  *)
-let pop (#a:eqtype) (r: ringstruct a{B.length r.rbuf = UInt32.v r.rsize}) : ST ((ringstruct a) * (option a)) 
-  (requires (fun h0 -> live h0 r.rbuf 
-                   /\ UInt32.lt r.head r.rsize
-                   /\ UInt32.lt r.tail r.rsize
-                    ))
-  (ensures fun h0 (r', o) h1 -> live h1 r'.rbuf
+let pop (#a:eqtype) (r: ringstruct a) : ST ((ringstruct a) * (option a)) 
+  (requires fun h0 -> live_rb h0 r 
+//                   /\ UInt32.lt r.head r.rsize
+//                   /\ UInt32.lt r.tail r.rsize
+                     /\ well_formed_rb r
+                    )
+  (ensures fun h0 (r', o) h1 -> live_rb h1 r'
                     /\ modifies_none h0 h1
                     /\ as_seq h1 r'.rbuf == as_seq h0 r.rbuf
                     /\ ( match o with 
@@ -132,6 +148,8 @@ let pop (#a:eqtype) (r: ringstruct a{B.length r.rbuf = UInt32.v r.rsize}) : ST (
                     /\ r'.rsize == r.rsize
                     /\ UInt32.lt r'.head r'.rsize
                     /\ UInt32.lt r'.tail r'.rsize
+                    /\ B.length r'.rbuf = UInt32.v r'.rsize
+                    /\ well_formed_rb r'
   )
   = 
   let b = is_rb_empty r in
@@ -143,6 +161,17 @@ let pop (#a:eqtype) (r: ringstruct a{B.length r.rbuf = UInt32.v r.rsize}) : ST (
   // buffer not updated  
   else  (r, Error)
 
+
+
+let init (#a:eqtype) (i: a) (s:UInt32.t {UInt32.gt s 0ul}) (hid: HS.rid) : ST (ringstruct a)
+(requires fun h -> true
+/\ is_eternal_region hid)
+(ensures fun h0 res h1 -> B.modifies B.loc_none h0 h1
+/\ B.fresh_loc (loc_buffer res.rbuf) h0 h1 
+)
+ =
+  {rbuf = B.malloc hid i s; head = 0ul; tail = 0ul; rsize=s}
+ 
 
 
 (* A simple program that pushes and pops an element from ring buffer
