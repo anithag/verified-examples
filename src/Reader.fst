@@ -32,24 +32,25 @@ let create_ringst _ =
     let tmp = {rbuf = B.null; head = 0ul; tail = 0ul; rsize = 0ul} in
     let hid = host_rid () in
     B.malloc hid tmp  1ul
-*)
+
 
 val host_rid : unit -> ST rid
 (requires fun h -> true)
 (ensures fun h0 res h1 -> is_eternal_region res)
 let host_rid _ = host_memory_region ()
-
+*)
 
   
 type message = UInt8.t
-type size_t = UInt32.t
 type datapointer = B.pointer message
      
 
-let init (s:size_t {gt s 0ul}) (hid: rid) : ST ringstruct8
+let init (s:UInt32.t {gt s 0ul}) (hid: rid) : ST ringstruct8
 (requires fun h -> true
 /\ is_eternal_region hid)
 (ensures fun h0 res h1 -> B.modifies B.loc_none h0 h1 
+/\ live_rb h1 res
+/\ well_formed_rb res
 )
  = Ring.init 0uy s hid
    

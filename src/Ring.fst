@@ -11,29 +11,6 @@ open LowStar.BufferOps
 open FStar.HyperStack.ST
 include LowStar.Monotonic.Buffer
 
-let host_memory_region (_:unit) : ST HS.rid
-  (requires fun _ -> true)
-  (requires fun h0 r h1 -> is_eternal_region r) 
-  = new_region HS.root
-
-let enclave_memory_region (_:unit) : ST HS.rid
-  (requires fun _ -> true)
-  (requires fun h0 r h1 -> is_eternal_region r) 
-  = new_region HS.root
-
-//allocate external memory
-let create_host_memory (#a:eqtype) (host_rid: HS.rid)  (init: a)  (size: UInt32.t) : ST (B.buffer a)
-  (requires fun _ -> is_eternal_region host_rid 
-                  /\ UInt32.v size > 0)
-  (ensures fun h0 b h1 -> live h1 b) 
-  = B.malloc host_rid init size  
-
-//allocate enclave memory
-let create_enclave_memory (#a:eqtype) (e_rid: HS.rid) (init: a) (size: UInt32.t) : ST (B.buffer a)
-  (requires fun _ -> is_eternal_region e_rid 
-                  /\ UInt32.v size > 0)
-  (ensures fun h0 b h1 -> live h1 b) 
-  = B.malloc e_rid init size  
 
 
 // reading external memory. This function simulates the external adversary
@@ -168,12 +145,14 @@ let init (#a:eqtype) (i: a) (s:UInt32.t {UInt32.gt s 0ul}) (hid: HS.rid) : ST (r
 /\ is_eternal_region hid)
 (ensures fun h0 res h1 -> B.modifies B.loc_none h0 h1
 /\ B.fresh_loc (loc_buffer res.rbuf) h0 h1 
+/\ well_formed_rb res
+/\ live_rb h1 res
 )
  =
   {rbuf = B.malloc hid i s; head = 0ul; tail = 0ul; rsize=s}
  
 
-
+(*
 (* A simple program that pushes and pops an element from ring buffer
  * The specification says that when operations are successful, the popped element 
  * should be equal to the pushed element. Else, we don't care.
@@ -201,7 +180,9 @@ let test_ringbuffer (): ST (option I8.t)
       o
   else
     Error
+*)
 
+(*
 let main () : ST Int32.t
   (requires fun h0 -> true)
   (ensures fun h0 r h1 -> true)
@@ -209,3 +190,4 @@ let main () : ST Int32.t
   let _ = test_ringbuffer () in
   0l
 
+*)
