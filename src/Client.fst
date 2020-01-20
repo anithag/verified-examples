@@ -4,12 +4,20 @@ module Client
 open Reader
 open Writer
 module HS = FStar.HyperStack
+module B = LowStar.Buffer 
 open FStar.HyperStack.ST
+
+type byte = UInt8.t
 
 let host_memory_region (_:unit) : ST HS.rid
   (requires fun _ -> true)
   (requires fun h0 r h1 -> is_eternal_region r) 
   = new_region HS.root
+
+// reading external memory. This function simulates the external adversary
+let read_host_memory (host_buffer:B.buffer byte) (addr:UInt32.t) : ST byte
+  (requires fun x -> True)
+  (ensures fun h0 b h1 -> B.modifies (B.loc_buffer host_buffer) h0 h1) = (UInt8.uint_to_t 0)
 
 let enclave_memory_region (_:unit) : ST HS.rid
   (requires fun _ -> true)
