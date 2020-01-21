@@ -2,12 +2,13 @@ module Reader
 
 open Ring
 module U8 = FStar.UInt8
-open FStar.HyperStack
-open FStar.HyperStack.ST
+module HS = FStar.HyperStack
+module HST = FStar.HyperStack.ST
 open FStar.UInt32
 module B = LowStar.Buffer
 open LowStar.BufferOps
-
+open FStar.HyperStack
+open FStar.HyperStack.ST
 
 type ringstruct8 = ringstruct UInt8.t
 
@@ -45,34 +46,38 @@ type message = UInt8.t
 type datapointer = B.pointer message
      
 
-let init (s:UInt32.t {gt s 0ul}) (hid: rid) : ST ringstruct8
+let init (s:UInt32.t {gt s 1ul}) (hid: rid) : ST ringstruct8
 (requires fun h -> true
 /\ is_eternal_region hid)
 (ensures fun h0 res h1 -> B.modifies B.loc_none h0 h1 
 /\ live_rb h1 res
-/\ well_formed_rb res
+/\ well_formed_rb h1 res
 )
  = Ring.init 0uy s hid
    
  
 
-abstract let read (r: ringstruct8) (f:datapointer  -> UInt32.t -> unit) : ST ringstruct8
+abstract let read (r: ringstruct8) (f:datapointer  -> UInt32.t -> unit) : ST UInt32.t
   (requires fun h -> 
      live_rb h r
-     /\ well_formed_rb r
+     /\ well_formed_rb h r
+     /\ not (is_rb_empty_spec h r)
   )
-  (ensures fun h0 r h1 -> 
+  (ensures fun h0 _ h1 -> 
   live_rb h1 r
-  /\ well_formed_rb r) 
+  /\ well_formed_rb h1 r) 
   =
-  let (r', header) = Ring.pop r in
-  let (r'', o) = Ring.pop r' in
-  match o with
-  | Error -> r
-  | Value m ->  // copy to datapointer
-    let mptr = B.gcmalloc root m 1ul in
+  let header = Ring.pop r in
+  // process header and get message length
+  let len = UInt.logand (UInt8.v header) (UInt.max_int 8) in
+  let canpop = Ring.is_poppable r in
+  if canpop then
+    let m = Ring.pop r in
+    let mptr = B.gcmalloc HS.root m 1ul in
     // call handler. For now hard coding the size of the message
     let _ = f mptr 1ul in
-    r''
-  
+    1ul
+  else
+     0ul
+     
 

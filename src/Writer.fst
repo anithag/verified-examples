@@ -9,15 +9,16 @@ module B = LowStar.Buffer
 open LowStar.BufferOps
 
 
-abstract let write (r: ringstruct8) (v:message) : ST ringstruct8
+abstract let write (r: ringstruct8) (v:message) : ST unit
   (requires fun h -> 
      live_rb h r
-     /\ well_formed_rb r
+     /\ well_formed_rb h r
+     /\ not (is_rb_full_spec h r)
   )
-  (ensures fun h0 res h1 -> 
-  live_rb h1 res
-  /\ well_formed_rb res) 
+  (ensures fun h0 _ h1 -> 
+  live_rb h1 r
+  /\ well_formed_rb h1 r) 
   =
-  let (r', s) = (Ring.push r v) in
-  r'
+  Ring.push r v
+  
   
