@@ -403,7 +403,7 @@ let pop4 (#a:eqtype) (r: ringstruct a) : ST (a*a*a*a)
   (requires fun h0 -> live_rb h0 r 
                      /\ well_formed_rb h0 r
                      /\ UInt32.gt (get_current_size_spec h0 r) 4ul
-                     /\ (UInt32.gt r.rsize 4ul)
+//                     /\ (UInt32.gt r.rsize 4ul)
                     )
   (ensures fun h0 (v1, v2, v3, v4) h1 -> live_rb h1 r
                    /\ well_formed_rb h1 r

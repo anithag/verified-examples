@@ -1,6 +1,7 @@
 module Reader
 
 open Ring
+open Misc
 module U8 = FStar.UInt8
 module HS = FStar.HyperStack
 module HST = FStar.HyperStack.ST
@@ -62,14 +63,15 @@ abstract let read (r: ringstruct8) (f:datapointer  -> UInt32.t -> unit) : ST UIn
      live_rb h r
      /\ well_formed_rb h r
      /\ not (is_rb_empty_spec h r)
+     /\ UInt32.gt (get_current_size_spec h r) 4ul
   )
   (ensures fun h0 _ h1 -> 
   live_rb h1 r
   /\ well_formed_rb h1 r) 
   =
-  let header = Ring.pop r in
+  let  (h1, h2, h3, h4) = Ring.pop4 r in
   // process header and get message length
-  let len = UInt.logand (UInt8.v header) (UInt.max_int 8) in
+  let len = Misc.make_double_word h1 h2 h3 h4  in
   let canpop = Ring.is_poppable r in
   if canpop then
     let m = Ring.pop r in

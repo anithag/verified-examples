@@ -5,10 +5,16 @@
   KreMLin version: 2f843633
  */
 
-#include "Writer.h"
+#include "kremlib.h"
+#ifndef __Misc_H
+#define __Misc_H
 
-void Writer_write(Ring_ringstruct__uint8_t r, uint8_t v1)
-{
-  Ring_push__uint8_t(r, v1);
-}
 
+
+
+uint32_t Misc_myshift(uint8_t h, uint32_t m);
+
+uint32_t Misc_make_double_word(uint8_t h1, uint8_t h2, uint8_t h3, uint8_t h4);
+
+#define __Misc_H_DEFINED
+#endif
