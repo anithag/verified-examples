@@ -275,7 +275,23 @@ let rsize = r.rsize in
 let space = get_current_size head tail rsize in
 if (UInt32.gt space 0ul) then true
 else false
-                
+
+let is_dword_poppable (#a:eqtype) (r:ringstruct a): ST bool
+(requires fun h -> live_rb h r
+                /\ well_formed_rb h r
+)
+(ensures fun h0 s h1 -> live_rb h1 r
+                     /\ well_formed_rb h1 r
+                     /\ modifies loc_none h0 h1
+                     /\ ((s == true) ==>  (UInt32.gte (get_current_size_spec h1 r) 4ul))
+)
+= let head = !* r.headptr in
+let tail = !* r.tailptr in
+let rsize = r.rsize in
+let space = get_current_size head tail rsize in
+if (UInt32.gte space 4ul) then true
+else false
+
 
 (* push: pushes an element at the head position
  * The pre-condition says that the invariants of the ringbuffer, namely,
@@ -397,12 +413,13 @@ let pop (#a:eqtype) (r: ringstruct a) : ST a
 
 
 
+#set-options "--z3rlimit 80 --initial_fuel 1 --max_fuel 1"
 //Handy routines
 // Return a sequence of bytes
 let pop4 (#a:eqtype) (r: ringstruct a) : ST (a*a*a*a) 
   (requires fun h0 -> live_rb h0 r 
                      /\ well_formed_rb h0 r
-                     /\ UInt32.gt (get_current_size_spec h0 r) 4ul
+                     /\ UInt32.gte (get_current_size_spec h0 r) 4ul
 //                     /\ (UInt32.gt r.rsize 4ul)
                     )
   (ensures fun h0 (v1, v2, v3, v4) h1 -> live_rb h1 r
@@ -415,6 +432,7 @@ let pop4 (#a:eqtype) (r: ringstruct a) : ST (a*a*a*a)
                    /\ (v3 == Seq.index (as_seq h1 r.rbuf) (UInt32.v (incr2_tail_spec h0 r)))
                    /\ (v4 == Seq.index (as_seq h1 r.rbuf) (UInt32.v (incr3_tail_spec h0 r)))
                    /\ (get_tail_spec h1 r == incr4_tail_spec h0 r)
+                     /\ (get_current_size_spec h0 r) = UInt32.add (get_current_size_spec h1 r) 4ul  
   )
   = 
    let m1 = pop r in

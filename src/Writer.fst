@@ -9,7 +9,7 @@ module B = LowStar.Buffer
 open LowStar.BufferOps
 
 
-abstract let write (r: ringstruct8) (v:message) : ST unit
+abstract let write (r: ringstruct8) (v:chartype) : ST unit
   (requires fun h -> 
      live_rb h r
      /\ well_formed_rb h r
