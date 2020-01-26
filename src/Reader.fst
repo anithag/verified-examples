@@ -57,8 +57,8 @@ let init (s:UInt32.t {gt s 1ul}) (hid: rid) : ST ringstruct8
  = Ring.init 0uy s hid
    
  
-
-abstract let read (r: ringstruct8) (f:datapointer  -> UInt32.t -> UInt32.t) : ST UInt32.t
+#set-options "--z3rlimit 80 --initial_fuel 1 --max_fuel 1"
+abstract let read (r: ringstruct8) (f:message -> datapointer  -> UInt32.t -> UInt32.t) : ST UInt32.t
   (requires fun h -> 
      live_rb h r
      /\ well_formed_rb h r
@@ -74,11 +74,16 @@ abstract let read (r: ringstruct8) (f:datapointer  -> UInt32.t -> UInt32.t) : ST
   let len = Misc.make_double_word h1 h2 h3 h4  in
   let canpop = Ring.is_poppable r in
   if canpop then
+    //message type
     let m = Ring.pop r in
-    let mptr = B.malloc HS.root m 1ul in
+    let canpop' = Ring.is_poppable r in
+    if canpop' then
+     let d = Ring.pop r in
+     let dptr = B.malloc HS.root d 1ul in
     // call handler. For now hard coding the size of the message
-    let s = f mptr 1ul in
+    let s = f m  dptr 1ul in
     s
+    else 0ul
   else
      0ul
      

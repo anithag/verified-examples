@@ -33,7 +33,8 @@ bool Ring_is_poppable__uint8_t(Ring_ringstruct__uint8_t r)
     return false;
 }
 
-uint32_t Reader_read(Ring_ringstruct__uint8_t r, uint32_t (*f)(uint8_t *x0, uint32_t x1))
+uint32_t
+Reader_read(Ring_ringstruct__uint8_t r, uint32_t (*f)(uint8_t x0, uint8_t *x1, uint32_t x2))
 {
   K___uint8_t_uint8_t_uint8_t_uint8_t scrut = Ring_pop4__uint8_t(r);
   uint8_t h1 = scrut.fst;
@@ -45,10 +46,17 @@ uint32_t Reader_read(Ring_ringstruct__uint8_t r, uint32_t (*f)(uint8_t *x0, uint
   if (canpop)
   {
     uint8_t m = Ring_pop__uint8_t(r);
-    uint8_t *mptr = KRML_HOST_MALLOC(sizeof (uint8_t));
-    mptr[0U] = m;
-    uint32_t s = f(mptr, (uint32_t)1U);
-    return s;
+    bool canpop_ = Ring_is_poppable__uint8_t(r);
+    if (canpop_)
+    {
+      uint8_t d = Ring_pop__uint8_t(r);
+      uint8_t *dptr = KRML_HOST_MALLOC(sizeof (uint8_t));
+      dptr[0U] = d;
+      uint32_t s = f(m, dptr, (uint32_t)1U);
+      return s;
+    }
+    else
+      return (uint32_t)0U;
   }
   else
     return (uint32_t)0U;

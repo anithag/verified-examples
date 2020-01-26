@@ -34,7 +34,8 @@ K___uint8_t_uint8_t_uint8_t_uint8_t Ring_pop4__uint8_t(Ring_ringstruct__uint8_t 
 
 bool Ring_is_poppable__uint8_t(Ring_ringstruct__uint8_t r);
 
-uint32_t Reader_read(Ring_ringstruct__uint8_t r, uint32_t (*f)(uint8_t *x0, uint32_t x1));
+uint32_t
+Reader_read(Ring_ringstruct__uint8_t r, uint32_t (*f)(uint8_t x0, uint8_t *x1, uint32_t x2));
 
 #define __Reader_H_DEFINED
 #endif
