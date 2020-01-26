@@ -58,7 +58,7 @@ let init (s:UInt32.t {gt s 1ul}) (hid: rid) : ST ringstruct8
    
  
 
-abstract let read (r: ringstruct8) (f:datapointer  -> UInt32.t -> unit) : ST UInt32.t
+abstract let read (r: ringstruct8) (f:datapointer  -> UInt32.t -> UInt32.t) : ST UInt32.t
   (requires fun h -> 
      live_rb h r
      /\ well_formed_rb h r
@@ -75,10 +75,10 @@ abstract let read (r: ringstruct8) (f:datapointer  -> UInt32.t -> unit) : ST UIn
   let canpop = Ring.is_poppable r in
   if canpop then
     let m = Ring.pop r in
-    let mptr = B.gcmalloc HS.root m 1ul in
+    let mptr = B.malloc HS.root m 1ul in
     // call handler. For now hard coding the size of the message
-    let _ = f mptr 1ul in
-    1ul
+    let s = f mptr 1ul in
+    s
   else
      0ul
      
