@@ -493,12 +493,4 @@ let rlen = 32ul in
   v
 
    
-(*
-let main () : ST Int32.t
-  (requires fun h0 -> true)
-  (ensures fun h0 r h1 -> true)
-  = 
-  let _ = test_ringbuffer () in
-  0l
 
-*)
