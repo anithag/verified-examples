@@ -12,15 +12,7 @@
 
 
 
-bool Ring_is_rb_full(uint32_t rsize, uint32_t head1, uint32_t tail1);
-
-bool Ring_is_rb_empty(uint32_t rsize, uint32_t head1, uint32_t tail1);
-
-uint32_t Ring_incr_ht(uint32_t ht, uint32_t rsize);
-
 uint32_t Ring_get_current_size(uint32_t head1, uint32_t tail1, uint32_t rsize);
-
-uint32_t Ring_get_remaining_space(uint32_t head1, uint32_t tail1, uint32_t rsize);
 
 typedef struct Ring_ringstruct__uint8_t_s
 {
@@ -30,16 +22,6 @@ typedef struct Ring_ringstruct__uint8_t_s
   uint32_t rsize;
 }
 Ring_ringstruct__uint8_t;
-
-Ring_ringstruct__uint8_t Ring_init__uint8_t(uint8_t i, uint32_t s);
-
-void Ring_push__uint8_t(Ring_ringstruct__uint8_t r, uint8_t v1);
-
-uint8_t Ring_pop__uint8_t(Ring_ringstruct__uint8_t r);
-
-void Ring_push2__uint8_t(Ring_ringstruct__uint8_t r, uint8_t v1, uint8_t v2);
-
-uint8_t Ring_test_ringbuffer();
 
 typedef Ring_ringstruct__uint8_t Reader_ringstruct8;
 
@@ -51,7 +33,11 @@ typedef uint8_t *Reader_datapointer;
 
 typedef uint64_t Reader_m_size_t;
 
+Ring_ringstruct__uint8_t Ring_init__uint8_t(uint8_t i, uint32_t s);
+
 Ring_ringstruct__uint8_t Reader_init(uint32_t s);
+
+uint8_t Ring_pop__uint8_t(Ring_ringstruct__uint8_t r);
 
 typedef struct K___uint8_t_uint8_t_uint8_t_uint8_t_s
 {
@@ -70,6 +56,8 @@ bool Ring_is_poppable__uint8_t(Ring_ringstruct__uint8_t r);
 
 uint32_t
 Reader_read(Ring_ringstruct__uint8_t r, uint32_t (*f)(uint32_t x0, uint8_t *x1, uint64_t x2));
+
+void Ring_push__uint8_t(Ring_ringstruct__uint8_t r, uint8_t v1);
 
 void Writer_write(Ring_ringstruct__uint8_t r, uint8_t v1);
 

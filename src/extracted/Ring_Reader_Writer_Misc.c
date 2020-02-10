@@ -7,25 +7,6 @@
 
 #include "Ring_Reader_Writer_Misc.h"
 
-bool Ring_is_rb_full(uint32_t rsize, uint32_t head1, uint32_t tail1)
-{
-  return head1 + (uint32_t)1U == tail1;
-}
-
-bool Ring_is_rb_empty(uint32_t rsize, uint32_t head1, uint32_t tail1)
-{
-  return head1 == tail1;
-}
-
-uint32_t Ring_incr_ht(uint32_t ht, uint32_t rsize)
-{
-  uint32_t ht_ = ht + (uint32_t)1U;
-  if (ht_ == rsize)
-    return (uint32_t)0U;
-  else
-    return ht_;
-}
-
 uint32_t Ring_get_current_size(uint32_t head1, uint32_t tail1, uint32_t rsize)
 {
   if (head1 >= tail1)
@@ -34,10 +15,13 @@ uint32_t Ring_get_current_size(uint32_t head1, uint32_t tail1, uint32_t rsize)
     return rsize - (tail1 - head1);
 }
 
-uint32_t Ring_get_remaining_space(uint32_t head1, uint32_t tail1, uint32_t rsize)
+static uint32_t incr_ht(uint32_t ht, uint32_t rsize)
 {
-  uint32_t c = Ring_get_current_size(head1, tail1, rsize);
-  return rsize - c;
+  uint32_t ht_ = ht + (uint32_t)1U;
+  if (ht_ == rsize)
+    return (uint32_t)0U;
+  else
+    return ht_;
 }
 
 Ring_ringstruct__uint8_t Ring_init__uint8_t(uint8_t i, uint32_t s)
@@ -52,44 +36,17 @@ Ring_ringstruct__uint8_t Ring_init__uint8_t(uint8_t i, uint32_t s)
     ((Ring_ringstruct__uint8_t){ .rbuf = buf0, .headptr = buf1, .tailptr = buf, .rsize = s });
 }
 
-void Ring_push__uint8_t(Ring_ringstruct__uint8_t r, uint8_t v1)
+Ring_ringstruct__uint8_t Reader_init(uint32_t s)
 {
-  uint32_t rsize = r.rsize;
-  uint32_t head1 = *r.headptr;
-  *r.headptr = Ring_incr_ht(head1, rsize);
-  r.rbuf[head1] = v1;
+  return Ring_init__uint8_t((uint8_t)0U, s);
 }
 
 uint8_t Ring_pop__uint8_t(Ring_ringstruct__uint8_t r)
 {
   uint32_t rsize = r.rsize;
   uint32_t tail1 = *r.tailptr;
-  *r.tailptr = Ring_incr_ht(tail1, rsize);
+  *r.tailptr = incr_ht(tail1, rsize);
   return r.rbuf[tail1];
-}
-
-void Ring_push2__uint8_t(Ring_ringstruct__uint8_t r, uint8_t v1, uint8_t v2)
-{
-  Ring_push__uint8_t(r, v1);
-  Ring_push__uint8_t(r, v2);
-}
-
-uint8_t Ring_test_ringbuffer()
-{
-  uint32_t rlen = (uint32_t)32U;
-  uint8_t rinit = (uint8_t)1U;
-  Ring_ringstruct__uint8_t rb = Ring_init__uint8_t(rinit, rlen);
-  Ring_push__uint8_t(rb, (uint8_t)3U);
-  uint8_t uu____0 = Ring_pop__uint8_t(rb);
-  Ring_push__uint8_t(rb, (uint8_t)4U);
-  uint8_t v1 = Ring_pop__uint8_t(rb);
-  Ring_push2__uint8_t(rb, (uint8_t)5U, (uint8_t)6U);
-  return v1;
-}
-
-Ring_ringstruct__uint8_t Reader_init(uint32_t s)
-{
-  return Ring_init__uint8_t((uint8_t)0U, s);
 }
 
 K___uint8_t_uint8_t_uint8_t_uint8_t Ring_pop4__uint8_t(Ring_ringstruct__uint8_t r)
@@ -157,6 +114,14 @@ Reader_read(Ring_ringstruct__uint8_t r, uint32_t (*f)(uint32_t x0, uint8_t *x1, 
   }
   else
     return (uint32_t)0U;
+}
+
+void Ring_push__uint8_t(Ring_ringstruct__uint8_t r, uint8_t v1)
+{
+  uint32_t rsize = r.rsize;
+  uint32_t head1 = *r.headptr;
+  *r.headptr = incr_ht(head1, rsize);
+  r.rbuf[head1] = v1;
 }
 
 void Writer_write(Ring_ringstruct__uint8_t r, uint8_t v1)
