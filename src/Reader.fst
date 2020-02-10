@@ -13,35 +13,6 @@ open FStar.HyperStack.ST
 
 type ringstruct8 = ringstruct UInt8.t
 
-(*
-private val regid : B.pointer rid
-let regid = let hid = host_memory_region () in
- B.malloc HyperStack.root hid 1ul 
-
-val host_rid : unit -> ST rid
-(requires fun h -> B.live h regid
-/\ is_eternal_region (B.get h regid 0)
-)
-(ensures fun h0 res h1 -> is_eternal_region res)
-let host_rid _ = (!* regid)
-
-val create_ringst : unit -> ST (B.pointer ringstruct8)
-(requires fun h -> B.live h regid 
- /\ is_eternal_region (B.get h regid 0)
- )
-(ensures fun h0 res h1 -> true)
-let create_ringst _ =
-    let tmp = {rbuf = B.null; head = 0ul; tail = 0ul; rsize = 0ul} in
-    let hid = host_rid () in
-    B.malloc hid tmp  1ul
-
-
-val host_rid : unit -> ST rid
-(requires fun h -> true)
-(ensures fun h0 res h1 -> is_eternal_region res)
-let host_rid _ = host_memory_region ()
-*)
-
   
 type message = UInt32.t
 type chartype = UInt8.t
