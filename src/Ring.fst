@@ -153,31 +153,15 @@ let incr_head_spec (#a:eqtype) (h:HS.mem) (r:ringstruct a {well_formed_rb h r}):
  * pushed into the head position. If not, buffer remains the same.
  * The post-condition also says that the invariants are preserved, and that the buffer is live.
  *)
-let push (#a:eqtype) (r: ringstruct a) (v: a) : ST unit
-  (requires fun h -> live_rb h r
-                  /\  well_formed_rb h r
-                  /\ not (is_rb_full_spec h r)
-                   )
-  (ensures fun h0 _ h1 -> 
-                    live_rb h1 r 
-                    /\ modifies (loc_union (loc_buffer r.rbuf)  (loc_buffer r.headptr)) h0 h1
-//                    /\ (s == false ==>  as_seq h1 r.rbuf == as_seq h0 r.rbuf)
-//                    /\ (s == false ==>  modifies loc_none h0 h1)
-                    /\ tail_unmodified_spec h0 h1 r r 
-                    /\ well_formed_rb h1 r
-//                    /\ (s = true ==>  as_seq h1 r.rbuf == Seq.upd (as_seq h0 r.rbuf) (UInt32.v (get_head_spec h0 r)) v)
-//                    /\ (s = true) ==>  (get_head_spec h1 r == incr_head_spec h0 r)
-                      /\ as_seq h1 r.rbuf == Seq.upd (as_seq h0 r.rbuf) (UInt32.v (get_head_spec h0 r)) v
-                      /\  get_head_spec h1 r == incr_head_spec h0 r
-                      /\ not (is_rb_empty_spec h1 r)
-                    )
-  =
+let push (#a:eqtype) (r: ringstruct a) (v: a)
+=
    // update the buffer at head and then
     // increment the head
   let rsize = r.rsize in
   let head =  !* r.headptr in
   let _ =  r.headptr *= (incr_ht head rsize) in
   B.upd r.rbuf head v
+
 
 let push2 (#a:eqtype) (r: ringstruct a) (v1:a) (v2:a) : ST unit
   (requires fun h -> live_rb h r
@@ -236,26 +220,10 @@ let incr_tail_spec (#a:eqtype) (h:HS.mem) (r:ringstruct a {well_formed_rb h r}):
  * tail is not modified other tail is modified.
  * The post-condition also says that the invariants are preserved
  *)
-let pop (#a:eqtype) (r: ringstruct a) : ST a 
-  (requires fun h0 -> live_rb h0 r 
-                     /\ well_formed_rb h0 r
-//                     /\ not (is_rb_empty_spec h0 r)
-                     /\ (UInt32.gt (get_current_size_spec h0 r) 0ul)
-                    )
-  (ensures fun h0 v h1 -> live_rb h1 r
-                   /\ well_formed_rb h1 r
-                   /\ modifies (loc_buffer r.tailptr) h0 h1
-                   /\ as_seq h1 r.rbuf == as_seq h0 r.rbuf
-                   /\ head_unmodified_spec h0 h1 r r 
-                   /\ (v == Seq.index (as_seq h1 r.rbuf) (UInt32.v (get_tail_spec h0 r)))
-                   /\ (get_tail_spec h1 r == incr_tail_spec h0 r)
-                   /\ (get_current_size_spec h1 r) = UInt32.sub (get_current_size_spec h0 r) 1ul
-//                   /\ UInt32.lte (get_current_size_spec h1 r)  (get_current_size_spec h0 r)
-  )
-  = 
+let pop (#a:eqtype) (r: ringstruct a)
+ = 
   let rsize = r.rsize in
   let tail = !* r.tailptr in
-//  let head = !* r.headptr in
   // First deref the buffer and then increment the tail
   let _ = r.tailptr *=  (incr_ht tail rsize) in
   B.index r.rbuf tail
@@ -264,70 +232,42 @@ let pop (#a:eqtype) (r: ringstruct a) : ST a
 // Check if the ring buffer can be popped.
 // Used by clients
 let is_poppable (#a:eqtype) (r:ringstruct a)
-= let head = !* r.headptr in
-let tail = !* r.tailptr in
-let rsize = r.rsize in
-let space = get_current_size head tail rsize in
-if (UInt32.gt space 0ul) then true
-else false
+= 
+  let head = !* r.headptr in
+  let tail = !* r.tailptr in
+  let rsize = r.rsize in
+  let space = get_current_size head tail rsize in
+    if (UInt32.gt space 0ul) then true
+    else false
 
 let is_dword_poppable (#a:eqtype) (r:ringstruct a)
-= let head = !* r.headptr in
-let tail = !* r.tailptr in
-let rsize = r.rsize in
-let space = get_current_size head tail rsize in
-if (UInt32.gte space 4ul) then true
-else false
+= 
+  let head = !* r.headptr in
+  let tail = !* r.tailptr in
+  let rsize = r.rsize in
+  let space = get_current_size head tail rsize in
+    if (UInt32.gte space 4ul) then true
+    else false
 
 
 #set-options "--z3rlimit 80 --initial_fuel 1 --max_fuel 1"
 //Handy routines
 // Return a sequence of bytes
-let pop4 (#a:eqtype) (r: ringstruct a) : ST (a*a*a*a) 
-  (requires fun h0 -> live_rb h0 r 
-                     /\ well_formed_rb h0 r
-                     /\ UInt32.gte (get_current_size_spec h0 r) 4ul
-//                     /\ (UInt32.gt r.rsize 4ul)
-                    )
-  (ensures fun h0 (v1, v2, v3, v4) h1 -> live_rb h1 r
-                   /\ well_formed_rb h1 r
-                   /\ modifies (loc_buffer r.tailptr) h0 h1
-                   /\ as_seq h1 r.rbuf == as_seq h0 r.rbuf
-                   /\ head_unmodified_spec h0 h1 r r 
-                   /\ (v1 == Seq.index (as_seq h1 r.rbuf) (UInt32.v (get_tail_spec h0 r)))
-                   /\ (v2 == Seq.index (as_seq h1 r.rbuf) (UInt32.v (incr_tail_spec h0 r)))
-                   /\ (v3 == Seq.index (as_seq h1 r.rbuf) (UInt32.v (incr2_tail_spec h0 r)))
-                   /\ (v4 == Seq.index (as_seq h1 r.rbuf) (UInt32.v (incr3_tail_spec h0 r)))
-                   /\ (get_tail_spec h1 r == incr4_tail_spec h0 r)
-                     /\ (get_current_size_spec h0 r) = UInt32.add (get_current_size_spec h1 r) 4ul  
-  )
-  = 
-   let m1 = pop r in
-   let m2 = pop r in
-   let m3 = pop r in
-   let m4 = pop r in
-   (m1, m2, m3, m4)
+let pop4 (#a:eqtype) (r: ringstruct a)
+= 
+  let m1 = pop r in
+  let m2 = pop r in
+  let m3 = pop r in
+  let m4 = pop r in
+  (m1, m2, m3, m4)
 
 
 
 
 
 // The way the fullness of ringbuffer is checked requires that the minimum size is 2
-let init (#a:eqtype) (i: a) (s:UInt32.t {UInt32.gt s 1ul}) (hid: HS.rid) : ST (ringstruct a)
-(requires fun h -> true
-/\ is_eternal_region hid)
-(ensures fun h0 res h1 -> B.modifies B.loc_none h0 h1
-/\ B.fresh_loc (loc_buffer res.rbuf) h0 h1 
-/\ B.fresh_loc (loc_buffer res.headptr) h0 h1 
-/\ B.fresh_loc (loc_buffer res.tailptr) h0 h1 
-/\ well_formed_rb h1 res
-/\ live_rb h1 res
-/\ B.length res.rbuf == UInt32.v s
-/\ (is_rb_empty_spec h1 res)
-/\ not (is_rb_full_spec h1 res)
-/\ res.rsize = s
-)
- =
+let init (#a:eqtype) (i: a) (s:UInt32.t {UInt32.gt s 1ul}) (hid: HS.rid)
+=
   {rbuf = B.malloc hid i s; headptr =  B.malloc hid 0ul 1ul; tailptr =  B.malloc hid 0ul 1ul; rsize=s}
  
 
