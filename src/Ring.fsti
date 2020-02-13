@@ -15,6 +15,7 @@ open FStar.Seq
 abstract noeq
 type ringstruct a = { rbuf: B.buffer a; headptr: B.pointer UInt32.t; tailptr: B.pointer UInt32.t; rsize: UInt32.t}
 
+(* Invariant. A ringbuffer is live if all the pointers are live and are disjoint from each other *)
 //val live_rb: (#a:eqtype)->(h:HS.mem)->(r:ringstruct a)->GTot Type0
 let live_rb (#a:eqtype) (h:HS.mem) (r:ringstruct a) : GTot Type0
 = B.live h r.rbuf
@@ -25,6 +26,12 @@ let live_rb (#a:eqtype) (h:HS.mem) (r:ringstruct a) : GTot Type0
 /\ loc_disjoint (loc_buffer r.headptr) (loc_buffer r.tailptr)
 
 
+(*
+ * Invariant. A ringbuffer is well-formed if
+ *   1.head and tail is less than the size of the ringbuffer and
+ *   2.length of ringbuffer is equal to the field rsize and
+ *   3.size of ringbuffer is greater than 0.
+*)
 let well_formed_rb (#a:eqtype) (h:HS.mem) (r:ringstruct a): GTot bool
   = 
   let head = B.get h r.headptr 0 in
