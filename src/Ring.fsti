@@ -88,18 +88,18 @@ val incr_head_spec: (#a:eqtype)->(h:HS.mem)->(r:ringstruct a {well_formed_rb h r
  * The post-condition also says that the invariants are preserved, and that the buffer is live.
  *)
 val push:(#a:eqtype)->(r: ringstruct a)->(v: a) ->ST unit
-  (requires fun h -> live_rb h r
-                  /\  well_formed_rb h r
-                  /\ not (is_rb_full_spec h r)
+    (requires fun h -> live_rb h r
+                    /\  well_formed_rb h r
+                    /\ not (is_rb_full_spec h r)
                    )
   (ensures fun h0 _ h1 -> 
                     live_rb h1 r 
                     /\ modifies (loc_union (loc_buffer r.rbuf)  (loc_buffer r.headptr)) h0 h1
                     /\ tail_unmodified_spec h0 h1 r r 
                     /\ well_formed_rb h1 r
-                      /\ as_seq h1 r.rbuf == Seq.upd (as_seq h0 r.rbuf) (UInt32.v (get_head_spec h0 r)) v
-                      /\  get_head_spec h1 r == incr_head_spec h0 r
-                      /\ not (is_rb_empty_spec h1 r)
+                    /\ as_seq h1 r.rbuf == Seq.upd (as_seq h0 r.rbuf) (UInt32.v (get_head_spec h0 r)) v
+                    /\  get_head_spec h1 r == incr_head_spec h0 r
+                    /\ not (is_rb_empty_spec h1 r)
                     )
 
 //val head_unmodified_spec: (#a:eqtype)->(h0:HS.mem)->(h1:HS.mem)->(r0:ringstruct a)->(r1: ringstruct a)->GTot bool
@@ -122,8 +122,8 @@ val incr_tail_spec: (#a:eqtype)->(h:HS.mem)->(r:ringstruct a {well_formed_rb h r
  *)
 val pop:(#a:eqtype)->(r: ringstruct a)->ST a 
   (requires fun h0 -> live_rb h0 r 
-                     /\ well_formed_rb h0 r
-                     /\ (UInt32.gt (get_current_size_spec h0 r) 0ul)
+                   /\ well_formed_rb h0 r
+                   /\ (UInt32.gt (get_current_size_spec h0 r) 0ul)
                     )
   (ensures fun h0 v h1 -> live_rb h1 r
                    /\ well_formed_rb h1 r
@@ -136,6 +136,10 @@ val pop:(#a:eqtype)->(r: ringstruct a)->ST a
   )
 
 
+(* 
+  The following functions help determine how head and tail pointers should be modified.
+  These are used push2/push4/pop2/pop4 functions.
+*)
 
 //val incr2_tail_spec: (#a:eqtype)->(h:HS.mem)->(r:ringstruct a {well_formed_rb h r /\ (UInt32.gt r.rsize 2ul)})->GTot (r':UInt32.t {UInt32.lt r' r.rsize})
 let incr2_tail_spec (#a:eqtype) (h:HS.mem) (r:ringstruct a {well_formed_rb h r /\ (UInt32.gt r.rsize 3ul)}): GTot (r':UInt32.t {UInt32.lt r' r.rsize})
