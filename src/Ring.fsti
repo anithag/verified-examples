@@ -13,7 +13,12 @@ open FStar.Seq
 
 
 abstract noeq
-type ringstruct a = { rbuf: B.buffer a; headptr: B.pointer UInt32.t; tailptr: B.pointer UInt32.t; rsize: UInt32.t}
+type ringstruct a = { 
+  rbuf: B.buffer a; 
+  headptr: B.pointer UInt32.t; 
+  tailptr: B.pointer UInt32.t; 
+  rsize  : (rsize: UInt32.t {B.length rbuf = UInt32.v rsize})
+  } 
 
 (* Invariant. A ringbuffer is live if all the pointers are live and are disjoint from each other *)
 //val live_rb: (#a:eqtype)->(h:HS.mem)->(r:ringstruct a)->GTot Type0
@@ -96,17 +101,16 @@ val incr_head_spec: (#a:eqtype)->(h:HS.mem)->(r:ringstruct a {well_formed_rb h r
  *)
 val push:(#a:eqtype)->(r: ringstruct a)->(v: a) ->ST unit
     (requires fun h -> live_rb h r
-                    /\  well_formed_rb h r
-                    /\ not (is_rb_full_spec h r)
+                    /\  (well_formed_rb h r ==>  not (is_rb_full_spec h r))
                    )
   (ensures fun h0 _ h1 -> 
                     live_rb h1 r 
-                    /\ modifies (loc_union (loc_buffer r.rbuf)  (loc_buffer r.headptr)) h0 h1
-                    /\ tail_unmodified_spec h0 h1 r r 
-                    /\ well_formed_rb h1 r
-                    /\ as_seq h1 r.rbuf == Seq.upd (as_seq h0 r.rbuf) (UInt32.v (get_head_spec h0 r)) v
-                    /\  get_head_spec h1 r == incr_head_spec h0 r
-                    /\ not (is_rb_empty_spec h1 r)
+                    /\ (well_formed_rb h0 r ==>  modifies (loc_union (loc_buffer r.rbuf)  (loc_buffer r.headptr)) h0 h1)
+                    /\ (well_formed_rb h0 r ==>  tail_unmodified_spec h0 h1 r r) 
+                    /\ (well_formed_rb h0 r ==>  well_formed_rb h1 r)
+                    /\ (well_formed_rb h0 r ==>  (as_seq h1 r.rbuf == Seq.upd (as_seq h0 r.rbuf) (UInt32.v (get_head_spec h0 r)) v))
+                    /\ (well_formed_rb h0 r ==>  (get_head_spec h1 r == incr_head_spec h0 r))
+                    /\ (well_formed_rb h0 r ==>  not (is_rb_empty_spec h1 r))
                     )
 
 //val head_unmodified_spec: (#a:eqtype)->(h0:HS.mem)->(h1:HS.mem)->(r0:ringstruct a)->(r1: ringstruct a)->GTot bool
@@ -127,21 +131,38 @@ val incr_tail_spec: (#a:eqtype)->(h:HS.mem)->(r:ringstruct a {well_formed_rb h r
  * tail is not modified other tail is modified.
  * The post-condition also says that the invariants are preserved
  *)
-val pop:(#a:eqtype)->(r: ringstruct a)->ST a 
+val pop:(#a:eqtype)->(r: ringstruct a)->ST (option a) 
   (requires fun h0 -> live_rb h0 r 
-                   /\ well_formed_rb h0 r
-                   /\ (UInt32.gt (get_current_size_spec h0 r) 0ul)
+                   /\ (well_formed_rb h0 r ==>  (UInt32.gt (get_current_size_spec h0 r) 0ul))
                     )
   (ensures fun h0 v h1 -> live_rb h1 r
-                   /\ well_formed_rb h1 r
-                   /\ modifies (loc_buffer r.tailptr) h0 h1
-                   /\ as_seq h1 r.rbuf == as_seq h0 r.rbuf
-                   /\ head_unmodified_spec h0 h1 r r 
-                   /\ (v == Seq.index (as_seq h1 r.rbuf) (UInt32.v (get_tail_spec h0 r)))
-                   /\ (get_tail_spec h1 r == incr_tail_spec h0 r)
-                   /\ (get_current_size_spec h1 r) = UInt32.sub (get_current_size_spec h0 r) 1ul
+                   /\ (well_formed_rb h0 r ==>  well_formed_rb h1 r)
+                   /\ (well_formed_rb h0 r ==>  modifies (loc_buffer r.tailptr) h0 h1)
+                   /\ (well_formed_rb h0 r ==>  (as_seq h1 r.rbuf == as_seq h0 r.rbuf))
+                   /\ (well_formed_rb h0 r ==>  head_unmodified_spec h0 h1 r r)
+                   /\ (well_formed_rb h0 r ==>  (match v with
+                                          | Some v -> v == Seq.index (as_seq h1 r.rbuf) (UInt32.v (get_tail_spec h0 r))
+                                          | None  -> True))
+                   /\ (well_formed_rb h0 r ==>  (get_tail_spec h1 r == incr_tail_spec h0 r))
+                   /\ (well_formed_rb h0 r ==>  (get_current_size_spec h1 r) = UInt32.sub (get_current_size_spec h0 r) 1ul)
   )
 
+
+
+// The way the fullness of ringbuffer is checked requires that the minimum size is 2
+val init: (#a:eqtype)->(i: a)->(s:UInt32.t {UInt32.gt s 1ul})->(hid: HS.rid)->ST (ringstruct a)
+(requires fun h -> true
+/\ is_eternal_region hid)
+(ensures fun h0 res h1 -> B.modifies B.loc_none h0 h1
+/\ B.fresh_loc (loc_buffer res.rbuf) h0 h1 
+/\ B.fresh_loc (loc_buffer res.headptr) h0 h1 
+/\ B.fresh_loc (loc_buffer res.tailptr) h0 h1 
+/\ well_formed_rb h1 res
+/\ live_rb h1 res
+/\ B.length res.rbuf == UInt32.v res.rsize
+/\ (is_rb_empty_spec h1 res)
+/\ not (is_rb_full_spec h1 res)
+)
 
 (* 
   The following functions help determine how head and tail pointers should be modified.
@@ -252,19 +273,3 @@ val pop4:(#a:eqtype)->(r: ringstruct a)->ST (a*a*a*a)
                    /\ (get_tail_spec h1 r == incr4_tail_spec h0 r)
                    /\ (get_current_size_spec h0 r) = UInt32.add (get_current_size_spec h1 r) 4ul  
   )
-
-// The way the fullness of ringbuffer is checked requires that the minimum size is 2
-val init: (#a:eqtype)->(i: a)->(s:UInt32.t {UInt32.gt s 1ul})->(hid: HS.rid)->ST (ringstruct a)
-(requires fun h -> true
-/\ is_eternal_region hid)
-(ensures fun h0 res h1 -> B.modifies B.loc_none h0 h1
-/\ B.fresh_loc (loc_buffer res.rbuf) h0 h1 
-/\ B.fresh_loc (loc_buffer res.headptr) h0 h1 
-/\ B.fresh_loc (loc_buffer res.tailptr) h0 h1 
-/\ well_formed_rb h1 res
-/\ live_rb h1 res
-/\ B.length res.rbuf == UInt32.v s
-/\ (is_rb_empty_spec h1 res)
-/\ not (is_rb_full_spec h1 res)
-/\ res.rsize = s
-)

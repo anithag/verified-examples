@@ -110,7 +110,7 @@ let get_remaining_space (head:UInt32.t) (tail:UInt32.t) (rsize:UInt32.t{UInt32.l
    *      h     t
    *)
    let c = get_current_size head tail rsize in
-     (UInt32.sub rsize c)
+    (UInt32.sub rsize c)
    
 
 let remaining_space_spec (#a:eqtype) (h:HS.mem) (r:ringstruct a{well_formed_rb h r}): GTot  (r':UInt32.t {UInt32.lte r' r.rsize})
@@ -157,29 +157,102 @@ let push (#a:eqtype) (r: ringstruct a) (v: a)
 =
    // update the buffer at head and then
     // increment the head
+  let h = HST.get () in
+  let _ = assert(live h r.rbuf) in
   let rsize = r.rsize in
   let head =  !* r.headptr in
-  let _ =  r.headptr *= (incr_ht head rsize) in
-  B.upd r.rbuf head v
+  if (UInt32.lt head rsize) then
+    let _ =  r.headptr *= (incr_ht head rsize) in
+    B.upd r.rbuf head v
+  else ()
+    
 
 
+let incr_tail_spec (#a:eqtype) (h:HS.mem) (r:ringstruct a {well_formed_rb h r}): GTot (r':UInt32.t {UInt32.lt r' r.rsize})
+  = let tail = B.get h r.tailptr 0 in
+  incr_ht_spec tail r.rsize
+
+
+(* pop:  pop off the element at tail
+ * The pre-condition checks that the invariants of the ringbuffer hold while
+ * the post-condition says that the element read from the ringbuffer is same as the 
+ * one read from the same index in the sequence formed from buffer. When the ringbuffer is full
+ * tail is not modified other tail is modified.
+ * The post-condition also says that the invariants are preserved
+ *)
+let pop (#a:eqtype) (r: ringstruct a)
+ = 
+  let rsize = r.rsize in
+  let tail = !* r.tailptr in
+  if (UInt32.lt tail rsize) then
+  // First deref the buffer and then increment the tail
+    let _ = r.tailptr *=  (incr_ht tail rsize) in
+    Some (B.index r.rbuf tail)
+  else None
+
+
+
+// The way the fullness of ringbuffer is checked requires that the minimum size is 2
+let init (#a:eqtype) (i: a) (s:UInt32.t {UInt32.gt s 1ul}) (hid: HS.rid)
+=
+ let b = B.malloc hid i s in
+  {
+  rbuf = b; 
+  headptr =  B.malloc hid 0ul 1ul; 
+  tailptr =  B.malloc hid 0ul 1ul;
+  rsize = s; 
+  }
+ 
+
+
+(* A simple program that pushes and pops an element from ring buffer
+ * The specification says that when operations are successful, the popped element 
+ * should be equal to the pushed element. Else, we don't care.
+ *)
+let test_ringbuffer (): ST (option UInt8.t)
+(requires fun h0 -> true)
+(requires fun h0 v h1 -> match v with 
+ | Some v' -> UInt8.eq v' 4uy
+ | None -> True)
+= 
+let rlen = 32ul in
+  let rinit = 1uy in
+  //ringbuffer is located in host memory region but is disjoint from the host_memory
+  let rb = init rinit rlen HS.root in
+  let _ = push rb 3uy in
+  let _ = pop rb in  
+  let _ = push rb 4uy in
+  let v = pop rb in
+//  push2 rb 5uy 6uy;
+//  push2 rb 7uy 8uy;
+//  let (v1, v2, v3, v4) = pop4 rb in
+  v
+
+
+#set-options "--z3rlimit 80 --initial_fuel 1 --max_fuel 1"
 let push2 (#a:eqtype) (r: ringstruct a) (v1:a) (v2:a) : ST unit
   (requires fun h -> live_rb h r
-                  /\  well_formed_rb h r
-                     /\ UInt32.gt (remaining_space_spec h r) 4ul
-                     /\ (UInt32.gt r.rsize 4ul)
+                  /\  (well_formed_rb h r ==>   UInt32.gt (remaining_space_spec h r) 4ul)
+                     /\  (well_formed_rb h r ==>  (UInt32.gt r.rsize 4ul))
                    )
   (ensures fun h0 _ h1 -> 
                     live_rb h1 r 
-                    /\ modifies (loc_union (loc_buffer r.rbuf)  (loc_buffer r.headptr)) h0 h1
-                    /\ tail_unmodified_spec h0 h1 r r 
-                    /\ well_formed_rb h1 r
-                    /\ as_seq h1 r.rbuf == (Seq.upd (Seq.upd (as_seq h0 r.rbuf) (UInt32.v (get_head_spec h0 r)) v1)  (UInt32.v (incr_head_spec h0 r)) v2)
-                    /\  get_head_spec h1 r == incr2_head_spec h0 r
+  //                  /\  ((well_formed_rb h0 r) ==>  modifies (loc_union (loc_buffer r.rbuf)  (loc_buffer r.headptr)) h0 h1)
+  //                  /\  (well_formed_rb h0 r ==>   tail_unmodified_spec h0 h1 r r )
+  //                  /\  (well_formed_rb h0 r ==>   well_formed_rb h1 r)
+  //                  /\  (well_formed_rb h0 r ==>   (as_seq h1 r.rbuf == (Seq.upd (Seq.upd (as_seq h0 r.rbuf) (UInt32.v (get_head_spec h0 r)) v1)  (UInt32.v (incr_head_spec h0 r)) v2)))
+  //                  /\  (well_formed_rb h0 r ==>   (get_head_spec h1 r == incr2_head_spec h0 r))
                     )
   =
+  let h = HST.get () in
+  let _ = assert(live_rb h r) in
   push r v1;
-  push r v2
+  let h' = HST.get () in
+  let _ = assert(well_formed_rb h r ==> well_formed_rb h' r) in
+  let _ = push r v2 in
+  let h'' = HST.get () in
+  let _ = assert(live_rb h'' r) in
+  assert(well_formed_rb h' r ==> well_formed_rb h'' r)
 
 (*
 SMT timing out. Fix this later
@@ -207,27 +280,6 @@ let push4 (#a:eqtype) (r: ringstruct a) (v1:a) (v2:a) (v3:a) (v4:a) : ST unit
   push r v4
 
 *)
-
-let incr_tail_spec (#a:eqtype) (h:HS.mem) (r:ringstruct a {well_formed_rb h r}): GTot (r':UInt32.t {UInt32.lt r' r.rsize})
-  = let tail = B.get h r.tailptr 0 in
-  incr_ht_spec tail r.rsize
-
-
-(* pop:  pop off the element at tail
- * The pre-condition checks that the invariants of the ringbuffer hold while
- * the post-condition says that the element read from the ringbuffer is same as the 
- * one read from the same index in the sequence formed from buffer. When the ringbuffer is full
- * tail is not modified other tail is modified.
- * The post-condition also says that the invariants are preserved
- *)
-let pop (#a:eqtype) (r: ringstruct a)
- = 
-  let rsize = r.rsize in
-  let tail = !* r.tailptr in
-  // First deref the buffer and then increment the tail
-  let _ = r.tailptr *=  (incr_ht tail rsize) in
-  B.index r.rbuf tail
-
 
 // Check if the ring buffer can be popped.
 // Used by clients
@@ -263,35 +315,6 @@ let pop4 (#a:eqtype) (r: ringstruct a)
 
 
 
-
-
-// The way the fullness of ringbuffer is checked requires that the minimum size is 2
-let init (#a:eqtype) (i: a) (s:UInt32.t {UInt32.gt s 1ul}) (hid: HS.rid)
-=
-  {rbuf = B.malloc hid i s; headptr =  B.malloc hid 0ul 1ul; tailptr =  B.malloc hid 0ul 1ul; rsize=s}
- 
-
-
-(* A simple program that pushes and pops an element from ring buffer
- * The specification says that when operations are successful, the popped element 
- * should be equal to the pushed element. Else, we don't care.
- *)
-let test_ringbuffer (): ST UInt8.t
-(requires fun h0 -> true)
-(requires fun h0 v h1 -> v == 4uy)
-= 
-let rlen = 32ul in
-  let rinit = 1uy in
-  //ringbuffer is located in host memory region but is disjoint from the host_memory
-  let rb = init rinit rlen HS.root in
-  let _ = push rb 3uy in
-  let _ = pop rb in  
-  let _ = push rb 4uy in
-  let v = pop rb in
-  push2 rb 5uy 6uy;
-//  push2 rb 7uy 8uy;
-//  let (v1, v2, v3, v4) = pop4 rb in
-  v
 
    
 
