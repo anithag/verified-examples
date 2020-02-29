@@ -1,6 +1,6 @@
 # verified-examples
 - `src` contains Examples verified in LowStar
-- `interester` contains interpreter for defensive semantics
+- `interpreter` contains interpreter for defensive semantics
 
 ## Prerequisites
 
